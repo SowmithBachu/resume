@@ -2,8 +2,9 @@
 
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useState, Suspense } from 'react';
+import { Mail, Loader } from 'lucide-react';
 
-interface PortfolioData {
+interface ResumeData {
   name?: string;
   email?: string;
   location?: string;
@@ -23,270 +24,149 @@ interface PortfolioData {
   skills?: string[];
 }
 
-function PortfolioContent() {
-  const searchParams = useSearchParams();
-  const [portfolioData, setPortfolioData] = useState<PortfolioData | null>(null);
-
-  useEffect(() => {
-    const data = searchParams.get('data');
-    if (data) {
-      try {
-        // Try to decode the URI component, handle errors gracefully
-        let decodedData;
-        try {
-          decodedData = decodeURIComponent(data);
-        } catch (decodeError) {
-          // If decodeURIComponent fails, try using the data directly
-          console.warn('URI decode failed, trying direct parse:', decodeError);
-          decodedData = data;
-        }
-        
-        // Parse the JSON data
-        const parsed = JSON.parse(decodedData);
-        setPortfolioData(parsed);
-      } catch (error) {
-        console.error('Error parsing portfolio data:', error);
-        // Try to get data from localStorage as fallback
-        const storedData = localStorage.getItem('portfolioData');
-        if (storedData) {
-          try {
-            setPortfolioData(JSON.parse(storedData));
-          } catch (e) {
-            console.error('Error parsing stored data:', e);
-          }
-        }
-      }
-    } else {
-      // Try to get data from localStorage if no URL param
-      const storedData = localStorage.getItem('portfolioData');
-      if (storedData) {
-        try {
-          setPortfolioData(JSON.parse(storedData));
-        } catch (e) {
-          console.error('Error parsing stored data:', e);
-        }
-      }
-    }
-  }, [searchParams]);
-
-  if (!portfolioData) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-zinc-900 via-black to-zinc-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-cyan-400/30 border-t-cyan-400 rounded-full animate-spin mx-auto mb-4"></div>
-          <h1 className="text-2xl font-semibold text-cyan-400 mb-4">Loading Portfolio</h1>
-          <p className="text-zinc-400">Please wait while we prepare your portfolio...</p>
-        </div>
-      </div>
-    );
-  }
+function MinimalCyberpunk({ data }: { data: ResumeData }) {
+  const experiences = data.experience ?? [];
+  const education = data.education ?? [];
+  const skills = data.skills ?? [];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-zinc-900 via-black to-zinc-900 text-white">
-      {/* Animated Background */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
+    <div className="min-h-screen bg-[#05070b] text-white relative overflow-hidden">
+      <div className="pointer-events-none fixed inset-0 opacity-40">
+        <div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(circle, rgba(0,255,255,0.08) 1px, transparent 1px)', backgroundSize: '50px 50px' }} />
       </div>
 
-      {/* Floating Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-xl bg-black/20 border-b border-cyan-500/20">
-        <div className="container mx-auto px-6 py-4 max-w-7xl">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse"></div>
-              <h1 className="text-lg font-bold bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">
-                {portfolioData.name || 'Portfolio'}
-              </h1>
-            </div>
-            {portfolioData.email && (
-              <a
-                href={`mailto:${portfolioData.email}`}
-                className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-purple-500 rounded-lg font-medium hover:shadow-lg hover:shadow-cyan-500/50 transition-all duration-300"
-              >
-                Contact
-              </a>
-            )}
-          </div>
-        </div>
-      </nav>
-
-      {/* Hero Section */}
-      <section className="relative pt-32 pb-20 px-6">
-        <div className="container mx-auto max-w-6xl text-center">
-          <div className="mb-6 inline-block">
-            <div className="absolute inset-0 bg-gradient-to-r from-cyan-500 to-purple-500 rounded-full blur-xl opacity-50 animate-pulse"></div>
-            <div className="relative w-32 h-32 mx-auto bg-gradient-to-br from-cyan-400 to-purple-500 rounded-full flex items-center justify-center">
-              <span className="text-5xl font-bold">
-                {portfolioData.name?.charAt(0).toUpperCase() || 'P'}
+      <header className="sticky top-0 z-20 border-b border-cyan-500/30 bg-[#05070b]/90 backdrop-blur">
+        <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
+          {data.email ? (
+            <a href={`mailto:${data.email}`} className="flex items-center gap-3 text-sm text-cyan-300">
+              <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-cyan-500/40 bg-cyan-500/10">
+                <Mail size={16} />
               </span>
-            </div>
-          </div>
-          
-          <h1 className="text-6xl md:text-7xl font-bold mb-6 bg-gradient-to-r from-cyan-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent animate-gradient">
-            {portfolioData.name || 'Your Name'}
-          </h1>
-          
-          {portfolioData.professionalTitle && (
-            <p className="text-2xl md:text-3xl text-cyan-300/80 mb-4 font-light">
-              {portfolioData.professionalTitle}
-            </p>
-          )}
-          
-          {portfolioData.location && (
-            <p className="text-zinc-400 mb-8 flex items-center justify-center gap-2">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-              {portfolioData.location}
-            </p>
-          )}
-          
-          {portfolioData.email && (
-            <a
-              href={`mailto:${portfolioData.email}`}
-              className="inline-block px-8 py-4 bg-gradient-to-r from-cyan-500 to-purple-500 rounded-xl font-semibold text-lg hover:shadow-2xl hover:shadow-cyan-500/50 hover:scale-105 transition-all duration-300"
-            >
-              Get in Touch
+              {data.email}
             </a>
+          ) : (
+            <div />
           )}
+          <a
+            href="/?edit=true"
+            className="rounded-lg border border-cyan-500/40 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-cyan-200 hover:bg-cyan-500/10"
+          >
+            Edit Portfolio
+          </a>
         </div>
-      </section>
+      </header>
 
-      {/* Content Container */}
-      <main className="relative container mx-auto px-6 max-w-5xl pb-20">
-        {/* About Section */}
-        {portfolioData.summary && (
-          <section className="mb-20">
-            <div className="backdrop-blur-xl bg-gradient-to-br from-cyan-500/10 to-purple-500/10 rounded-2xl p-8 border border-cyan-500/20 hover:border-cyan-500/40 transition-all duration-300">
-              <h2 className="text-4xl font-bold mb-6 bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">
-                About
-              </h2>
-              <p className="text-xl leading-relaxed text-zinc-300">
-                {portfolioData.summary}
-              </p>
+      <main className="mx-auto flex max-w-5xl flex-col gap-12 px-6 py-16 lg:flex-row">
+        <section className="w-full space-y-6 lg:w-1/2">
+          <div className="rounded-2xl border border-cyan-500/40 bg-black/40 p-8">
+            <div className="mb-6 inline-flex h-16 w-16 items-center justify-center rounded-2xl border border-cyan-500/40 text-3xl font-bold text-cyan-300">
+              {(data.name || 'U').charAt(0).toUpperCase()}
             </div>
-          </section>
-        )}
-
-        {/* Experience Section */}
-        {portfolioData.experience && portfolioData.experience.length > 0 && (
-          <section className="mb-20">
-            <h2 className="text-4xl font-bold mb-10 text-center bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">
-              Experience
-            </h2>
-            <div className="space-y-6">
-              {portfolioData.experience.map((exp, index) => (
-                <div
-                  key={index}
-                  className="group backdrop-blur-xl bg-gradient-to-br from-cyan-500/10 to-purple-500/10 rounded-2xl p-8 border border-cyan-500/20 hover:border-cyan-500/40 hover:shadow-2xl hover:shadow-cyan-500/20 transition-all duration-300"
-                >
-                  <div className="flex items-start gap-4 mb-4">
-                    <div className="w-2 h-2 bg-cyan-400 rounded-full mt-2 animate-pulse"></div>
-                    <div className="flex-1">
-                      <h3 className="text-2xl font-bold text-cyan-400 mb-2">
-                        {exp.title}
-                      </h3>
-                      <p className="text-purple-300 mb-2">
-                        {exp.company}
-                        {exp.duration && (
-                          <span className="text-zinc-400 ml-2">• {exp.duration}</span>
-                        )}
-                      </p>
-                      {exp.description && (
-                        <p className="text-zinc-300 leading-relaxed mt-4">
-                          {exp.description}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Education Section */}
-        {portfolioData.education && portfolioData.education.length > 0 && (
-          <section className="mb-20">
-            <h2 className="text-4xl font-bold mb-10 text-center bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">
-              Education
-            </h2>
-            <div className="grid md:grid-cols-2 gap-6">
-              {portfolioData.education.map((edu, index) => (
-                <div
-                  key={index}
-                  className="backdrop-blur-xl bg-gradient-to-br from-purple-500/10 to-cyan-500/10 rounded-2xl p-6 border border-purple-500/20 hover:border-purple-500/40 hover:shadow-2xl hover:shadow-purple-500/20 transition-all duration-300"
-                >
-                  <h3 className="text-xl font-bold text-purple-400 mb-2">
-                    {edu.degree}
-                  </h3>
-                  <p className="text-cyan-300 mb-1">
-                    {edu.institution}
-                  </p>
-                  {edu.year && (
-                    <p className="text-zinc-400 text-sm">
-                      {edu.year}
-                    </p>
-                  )}
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Skills Section */}
-        {portfolioData.skills && portfolioData.skills.length > 0 && (
-          <section className="mb-20">
-            <h2 className="text-4xl font-bold mb-10 text-center bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">
-              Skills
-            </h2>
-            <div className="flex flex-wrap justify-center gap-4">
-              {portfolioData.skills.map((skill, index) => (
-                <div
-                  key={index}
-                  className="group px-6 py-3 bg-gradient-to-r from-cyan-500/20 to-purple-500/20 border border-cyan-500/30 rounded-full hover:border-cyan-400 hover:bg-gradient-to-r hover:from-cyan-500/30 hover:to-purple-500/30 hover:scale-110 transition-all duration-300 cursor-default"
-                >
-                  <span className="text-cyan-300 font-medium">{skill}</span>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Footer */}
-        <footer className="mt-20 pt-8 border-t border-cyan-500/20">
-          <div className="text-center">
-            {portfolioData.email && (
-              <a
-                href={`mailto:${portfolioData.email}`}
-                className="inline-block mb-4 text-cyan-400 hover:text-cyan-300 transition-colors"
-              >
-                {portfolioData.email}
-              </a>
-            )}
-            <p className="text-zinc-500 text-sm">
-              © {new Date().getFullYear()} {portfolioData.name || 'Portfolio'}. All rights reserved.
-            </p>
+            <h1 className="text-4xl font-black text-white">{data.name || 'Your Name'}</h1>
+            {data.professionalTitle && <p className="mt-2 text-lg text-cyan-200">{data.professionalTitle}</p>}
+            {data.location && <p className="mt-2 text-sm text-cyan-100/70">{data.location}</p>}
+            {data.summary && <p className="mt-6 text-sm leading-relaxed text-cyan-100/80">{data.summary}</p>}
           </div>
-        </footer>
+
+          {skills.length > 0 && (
+            <div className="rounded-2xl border border-cyan-500/30 bg-black/40 p-6">
+              <h2 className="mb-4 text-sm font-semibold uppercase tracking-[0.3em] text-cyan-300">Skills</h2>
+              <div className="flex flex-wrap gap-3">
+                {skills.map((skill, index) => (
+                  <span key={index} className="rounded-full border border-cyan-500/30 px-4 py-1 text-xs text-cyan-100">
+                    {skill}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </section>
+
+        <section className="w-full space-y-8 lg:w-1/2">
+          {experiences.length > 0 && (
+            <div className="rounded-2xl border border-cyan-500/30 bg-black/40 p-6">
+              <h2 className="mb-5 text-sm font-semibold uppercase tracking-[0.3em] text-cyan-300">Experience</h2>
+              <div className="space-y-5">
+                {experiences.map((exp, index) => (
+                  <div key={index} className="border-l-2 border-cyan-500/40 pl-4">
+                    <p className="text-xs uppercase tracking-[0.2em] text-cyan-200">{exp.duration}</p>
+                    <h3 className="text-lg font-semibold text-white">{exp.title}</h3>
+                    <p className="text-sm text-cyan-100/80">{exp.company}</p>
+                    {exp.description && <p className="mt-2 text-sm text-cyan-100/70">{exp.description}</p>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {education.length > 0 && (
+            <div className="rounded-2xl border border-cyan-500/30 bg-black/40 p-6">
+              <h2 className="mb-5 text-sm font-semibold uppercase tracking-[0.3em] text-cyan-300">Education</h2>
+              <div className="space-y-4">
+                {education.map((edu, index) => (
+                  <div key={index} className="border-l-2 border-cyan-500/40 pl-4">
+                    <p className="text-xs uppercase tracking-[0.2em] text-cyan-200">{edu.year}</p>
+                    <h3 className="text-lg font-semibold text-white">{edu.degree}</h3>
+                    <p className="text-sm text-cyan-100/80">{edu.institution}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </section>
       </main>
     </div>
   );
 }
 
+function PortfolioContent() {
+  const searchParams = useSearchParams();
+  const [data, setData] = useState<ResumeData | null>(null);
+
+  useEffect(() => {
+    const encoded = searchParams.get('data');
+    if (encoded) {
+      try {
+        const decoded = decodeURIComponent(encoded);
+        setData(JSON.parse(decoded));
+        return;
+      } catch (error) {
+        console.error('Failed to parse portfolio data:', error);
+      }
+    }
+
+    const stored = localStorage.getItem('portfolioData');
+    if (stored) {
+      try {
+        setData(JSON.parse(stored));
+      } catch (error) {
+        console.error('Failed to parse stored data:', error);
+      }
+    }
+  }, [searchParams]);
+
+  if (!data) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center text-white">
+        <Loader className="animate-spin" size={48} />
+      </div>
+    );
+  }
+
+  return <MinimalCyberpunk data={data} />;
+}
+
 export default function PortfolioPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-gradient-to-br from-zinc-900 via-black to-zinc-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-cyan-400/30 border-t-cyan-400 rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-zinc-400">Loading portfolio...</p>
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-black flex items-center justify-center text-white">
+          <Loader className="animate-spin" size={48} />
         </div>
-      </div>
-    }>
+      }
+    >
       <PortfolioContent />
     </Suspense>
   );
 }
+
