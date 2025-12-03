@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { supabaseAdmin } from '@/lib/supabase-server';
 
 export async function GET(req: NextRequest) {
   const clientId = process.env.GOOGLE_CLIENT_ID;
@@ -72,10 +73,41 @@ export async function GET(req: NextRequest) {
     picture?: string;
   };
 
+  // Save user to Supabase
+  if (supabaseAdmin && user.id && user.email) {
+    try {
+      // Check if user exists
+      const { data: existingUser } = await supabaseAdmin
+        .from('users')
+        .select('id')
+        .eq('google_id', user.id)
+        .single();
+
+      if (existingUser) {
+        // Update existing user
+        await supabaseAdmin
+          .from('users')
+          .update({
+            email: user.email,
+            name: user.name || null,
+          })
+          .eq('google_id', user.id);
+      } else {
+        // Insert new user
+        await supabaseAdmin.from('users').insert({
+          google_id: user.id,
+          email: user.email,
+          name: user.name || null,
+        });
+      }
+    } catch (error) {
+      // Silently fail - continue even if database save fails
+    }
+  }
+
   const res = NextResponse.redirect(new URL('/upload', origin));
 
-  // Minimal demo: store basic user info in a non-httpOnly cookie
-  // so the client can read it if needed.
+  // Store basic user info in cookie for client-side access
   res.cookies.set(
     'google_user',
     JSON.stringify({

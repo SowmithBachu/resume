@@ -266,17 +266,61 @@ export default function UploadPage() {
 
       setResumeData(result.data);
       
-      // Generate ID and store portfolio data with ID for sharing
-      const id =
-        typeof crypto !== 'undefined' && 'randomUUID' in crypto
-          ? crypto.randomUUID()
-          : Math.random().toString(36).slice(2);
+      // Get user info from cookie
+      const cookies = document.cookie.split(';');
+      const googleUserCookie = cookies.find(c => c.trim().startsWith('google_user='));
+      let googleId: string | null = null;
       
-      // Store in localStorage for workspace route and sharing
-      localStorage.setItem('portfolioData', JSON.stringify(result.data));
-      localStorage.setItem(`portfolio_${id}`, JSON.stringify(result.data));
+      if (googleUserCookie) {
+        try {
+          const userData = JSON.parse(decodeURIComponent(googleUserCookie.split('=')[1]));
+          googleId = userData.id || null;
+        } catch (e) {
+          console.error('Error parsing user cookie:', e);
+        }
+      }
+
+      // Save to Supabase if user is logged in
+      let portfolioId: string | null = null;
+      if (googleId) {
+        try {
+          const saveResponse = await fetch('/api/portfolio', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              googleId,
+              data: result.data,
+            }),
+          });
+
+          if (saveResponse.ok) {
+            const saveResult = await saveResponse.json();
+            portfolioId = saveResult.portfolioId;
+          }
+        } catch (err) {
+          console.error('Error saving to database:', err);
+          // Continue with localStorage fallback
+        }
+      }
+
+      // Fallback to localStorage if no database save or no user
+      if (!portfolioId) {
+        const id =
+          typeof crypto !== 'undefined' && 'randomUUID' in crypto
+            ? crypto.randomUUID()
+            : Math.random().toString(36).slice(2);
+        
+        localStorage.setItem('portfolioData', JSON.stringify(result.data));
+        localStorage.setItem(`portfolio_${id}`, JSON.stringify(result.data));
+        portfolioId = id;
+      } else {
+        // Still store in localStorage for immediate access
+        localStorage.setItem('portfolioData', JSON.stringify(result.data));
+      }
       
-      router.push(`/upload/${id}`);
+      router.push(`/upload/${portfolioId}`);
     } catch (err: any) {
       console.error('Error processing resume:', err);
       setError(err.message || 'An error occurred while processing your resume');

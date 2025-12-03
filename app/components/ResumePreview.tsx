@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ChevronDown, Plus, Trash2 } from 'lucide-react';
 
 interface ResumeData {
@@ -78,16 +78,32 @@ function CollapsibleSection({
 
 export default function ResumePreview({ data, onDataChange }: ResumePreviewProps) {
   const [formData, setFormData] = useState<ResumeData>(data);
+  const skipNextUpdateRef = useRef(false);
+  const dataStringRef = useRef<string>(JSON.stringify(data));
 
-  // Update formData when data prop changes
+  // Update formData when data prop changes (only if actually different)
   useEffect(() => {
-    setFormData(data);
+    const currentDataString = JSON.stringify(data);
+    if (currentDataString !== dataStringRef.current) {
+      skipNextUpdateRef.current = true;
+      setFormData(data);
+      dataStringRef.current = currentDataString;
+    }
   }, [data]);
 
-  // Notify parent of data changes
+  // Notify parent of data changes (skip if update came from parent)
   useEffect(() => {
+    if (skipNextUpdateRef.current) {
+      skipNextUpdateRef.current = false;
+      return;
+    }
+    
     if (onDataChange) {
-      onDataChange(formData);
+      const currentFormDataString = JSON.stringify(formData);
+      if (currentFormDataString !== dataStringRef.current) {
+        onDataChange(formData);
+        dataStringRef.current = currentFormDataString;
+      }
     }
   }, [formData, onDataChange]);
 

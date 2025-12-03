@@ -52,30 +52,56 @@ function PortfolioContent() {
       return;
     }
 
-    try {
-      // Try to get portfolio data from localStorage with the ID
-      const stored = localStorage.getItem(`portfolio_${portfolioId}`);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        setData(parsed);
-      } else {
-        // Fallback: try to get from URL params (for direct sharing)
-        const urlParams = new URLSearchParams(window.location.search);
-        const encodedData = urlParams.get('data');
-        if (encodedData) {
-          try {
-            const decoded = decodeURIComponent(encodedData);
-            setData(JSON.parse(decoded));
-          } catch (e) {
-            console.error('Failed to parse URL data:', e);
+    const loadPortfolio = async () => {
+      try {
+        // First try to load from Supabase
+        const response = await fetch(`/api/portfolio?id=${portfolioId}`);
+        
+        if (response.ok) {
+          const result = await response.json();
+          if (result.data) {
+            setData(result.data);
+            setLoading(false);
+            return;
           }
         }
+
+        // Fallback to localStorage
+        const stored = localStorage.getItem(`portfolio_${portfolioId}`);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          setData(parsed);
+        } else {
+          // Fallback: try to get from URL params (for direct sharing)
+          const urlParams = new URLSearchParams(window.location.search);
+          const encodedData = urlParams.get('data');
+          if (encodedData) {
+            try {
+              const decoded = decodeURIComponent(encodedData);
+              setData(JSON.parse(decoded));
+            } catch (e) {
+              console.error('Failed to parse URL data:', e);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load portfolio data:', error);
+        // Fallback to localStorage on error
+        try {
+          const stored = localStorage.getItem(`portfolio_${portfolioId}`);
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            setData(parsed);
+          }
+        } catch (localError) {
+          console.error('Failed to load from localStorage:', localError);
+        }
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error('Failed to load portfolio data:', error);
-    } finally {
-      setLoading(false);
-    }
+    };
+
+    loadPortfolio();
   }, [portfolioId]);
 
   if (loading) {

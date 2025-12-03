@@ -45,12 +45,45 @@ function EditPortfolioView({ initialData, portfolioId }: { initialData: ResumeDa
     setPortfolioData(initialData);
   }, [initialData]);
 
-  const handleDataChange = (data: ResumeData) => {
+  const handleDataChange = async (data: ResumeData) => {
     setPortfolioData(data);
-    // Update localStorage with ID for sharing
+    
+    // Update localStorage
     if (typeof window !== 'undefined') {
       localStorage.setItem('portfolioData', JSON.stringify(data));
       localStorage.setItem(`portfolio_${portfolioId}`, JSON.stringify(data));
+    }
+
+    // Save to Supabase if user is logged in
+    const cookies = document.cookie.split(';');
+    const googleUserCookie = cookies.find(c => c.trim().startsWith('google_user='));
+    let googleId: string | null = null;
+    
+    if (googleUserCookie) {
+      try {
+        const userData = JSON.parse(decodeURIComponent(googleUserCookie.split('=')[1]));
+        googleId = userData.id || null;
+      } catch (e) {
+        console.error('Error parsing user cookie:', e);
+      }
+    }
+
+    if (googleId) {
+      try {
+        await fetch('/api/portfolio', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            googleId,
+            portfolioId,
+            data,
+          }),
+        });
+      } catch (err) {
+        console.error('Error saving to database:', err);
+      }
     }
   };
 
@@ -194,24 +227,58 @@ export default function UploadWorkspacePage() {
       return;
     }
 
-    try {
-      // Try to get portfolio data with ID first, then fallback to general storage
-      const storedById = localStorage.getItem(`portfolio_${portfolioId}`);
-      const stored = storedById || localStorage.getItem('portfolioData');
-      
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        setData(parsed);
-        // Also store with ID for sharing
-        if (!storedById) {
-          localStorage.setItem(`portfolio_${portfolioId}`, JSON.stringify(parsed));
+    const loadPortfolio = async () => {
+      try {
+        // First try to load from Supabase
+        const response = await fetch(`/api/portfolio?id=${portfolioId}`);
+        
+        if (response.ok) {
+          const result = await response.json();
+          if (result.data) {
+            setData(result.data);
+            // Also store in localStorage for offline access
+            localStorage.setItem('portfolioData', JSON.stringify(result.data));
+            localStorage.setItem(`portfolio_${portfolioId}`, JSON.stringify(result.data));
+            setLoading(false);
+            return;
+          }
         }
+
+        // Fallback to localStorage
+        const storedById = localStorage.getItem(`portfolio_${portfolioId}`);
+        const stored = storedById || localStorage.getItem('portfolioData');
+        
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          setData(parsed);
+          // Also store with ID for sharing
+          if (!storedById) {
+            localStorage.setItem(`portfolio_${portfolioId}`, JSON.stringify(parsed));
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load portfolio data:', error);
+        // Fallback to localStorage on error
+        try {
+          const storedById = localStorage.getItem(`portfolio_${portfolioId}`);
+          const stored = storedById || localStorage.getItem('portfolioData');
+          
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            setData(parsed);
+            if (!storedById) {
+              localStorage.setItem(`portfolio_${portfolioId}`, JSON.stringify(parsed));
+            }
+          }
+        } catch (localError) {
+          console.error('Failed to load from localStorage:', localError);
+        }
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error('Failed to load portfolio data from localStorage', error);
-    } finally {
-      setLoading(false);
-    }
+    };
+
+    loadPortfolio();
   }, [portfolioId]);
 
   if (loading || !data || !portfolioId) {
