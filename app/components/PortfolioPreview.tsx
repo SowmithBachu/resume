@@ -468,14 +468,7 @@ export default function PortfolioPreview({
                 </Button>
               </a>
             )}
-            {data.email && (
-              <a href={`mailto:${data.email}`}>
-                <Button variant="outline" size="icon" className="rounded-full transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-800 hover:scale-110">
-                  <Mail className="h-5 w-5" />
-                  <span className="sr-only">Email</span>
-                </Button>
-              </a>
-            )}
+            {/* Email icon removed as requested */}
           </div>
         </section>
 

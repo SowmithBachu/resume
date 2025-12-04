@@ -3,7 +3,8 @@
 import { useEffect, useState, Suspense } from 'react';
 import { useParams } from 'next/navigation';
 import PortfolioPreview from '../../components/PortfolioPreview';
-import { Loader } from 'lucide-react';
+import { Loader, Download } from 'lucide-react';
+import { downloadPortfolioHTML } from '../../utils/generatePortfolioHTML';
 
 interface PortfolioData {
   name?: string;
@@ -143,6 +144,15 @@ function PortfolioContent() {
   return (
     <div className="min-h-screen bg-white dark:bg-[#121212]">
       <PortfolioPreview data={data} customElements={data.customElements} />
+      <div className="fixed bottom-8 right-8 z-50">
+        <button
+          onClick={() => downloadPortfolioHTML(data, data.customElements || [])}
+          className="flex items-center gap-2 px-5 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all shadow-lg hover:shadow-xl font-medium"
+        >
+          <Download className="w-5 h-5" />
+          Download Source
+        </button>
+      </div>
     </div>
   );
 }

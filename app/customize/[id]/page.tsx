@@ -2,10 +2,11 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { ArrowLeft, X, Settings2, Share2, Check, Copy } from 'lucide-react';
+import { ArrowLeft, X, Settings2, Share2, Check, Copy, Download } from 'lucide-react';
 import PortfolioPreview from '../../components/PortfolioPreview';
 import { UIElementsPalette, renderCustomElement, UIElement } from '../../components/UIElements';
 import { ElementEditor } from '../../components/ElementEditor';
+import { downloadPortfolioHTML } from '../../utils/generatePortfolioHTML';
 
 interface ResumeData {
   name?: string;
@@ -280,6 +281,13 @@ function CustomizePortfolioView({ initialData, portfolioId }: { initialData: Res
               Back to Edit
             </a>
             <button
+              onClick={() => downloadPortfolioHTML(portfolioData, portfolioData.customElements || [])}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 dark:bg-green-500 text-white rounded-lg hover:bg-green-700 dark:hover:bg-green-600 transition-all text-sm font-medium shadow-sm hover:shadow-md"
+            >
+              <Download className="w-4 h-4" />
+              Download Source
+            </button>
+            <button
               onClick={handleOpenShareModal}
               className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-zinc-800 text-gray-900 dark:text-gray-100 rounded-lg hover:bg-gray-200 dark:hover:bg-zinc-700 transition-all text-sm font-medium shadow-sm hover:shadow-md"
             >
@@ -310,14 +318,19 @@ function CustomizePortfolioView({ initialData, portfolioId }: { initialData: Res
 
         {/* Draggable divider */}
         <div
-          className="relative w-1 cursor-col-resize bg-zinc-200 dark:bg-zinc-800 flex items-stretch"
+          className="relative w-8 cursor-col-resize flex items-stretch group"
           onMouseDown={handleDividerMouseDown}
         >
-          <div className="w-px bg-zinc-300 dark:bg-zinc-700 mx-auto h-full" />
+          <div className="mx-auto h-full flex items-center">
+            <div className="w-1.5 h-40 rounded-full bg-gradient-to-b from-zinc-200 via-zinc-300 to-zinc-200 dark:from-zinc-800 dark:via-zinc-700 dark:to-zinc-800 shadow-sm group-hover:shadow-md group-hover:from-blue-200 group-hover:via-blue-400 group-hover:to-blue-200 dark:group-hover:from-blue-900 dark:group-hover:via-blue-600 dark:group-hover:to-blue-900 transition-all duration-200"></div>
+          </div>
           <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 flex items-center pointer-events-none">
-            <div className="w-7 h-10 rounded-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 shadow-sm flex items-center justify-center">
-              <div className="w-0.5 h-5 bg-zinc-400 rounded-full mx-0.5" />
-              <div className="w-0.5 h-5 bg-zinc-400 rounded-full mx-0.5" />
+            <div className="w-8 h-12 rounded-full bg-white/90 dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-700 shadow-sm flex items-center justify-center backdrop-blur-sm">
+              <div className="flex flex-col gap-0.5">
+                <span className="w-3 h-0.5 rounded-full bg-zinc-400/80 dark:bg-zinc-500/80"></span>
+                <span className="w-3 h-0.5 rounded-full bg-zinc-400/80 dark:bg-zinc-500/80"></span>
+                <span className="w-3 h-0.5 rounded-full bg-zinc-400/80 dark:bg-zinc-500/80"></span>
+              </div>
             </div>
           </div>
         </div>
