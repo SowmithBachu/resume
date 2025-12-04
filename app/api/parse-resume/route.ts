@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { redis } from '@/lib/redis-client';
 
 interface ResumeData {
   name?: string;
@@ -26,8 +27,7 @@ interface ResumeData {
 }
 
 
-async function parseResumeWithGemini(imageData: string[]): Promise<ResumeData> {
-  const apiKey = process.env.GEMINI_API_KEY;
+async function parseResumeWithGemini(imageData: string[], apiKey: string): Promise<ResumeData> {
   if (!apiKey) {
     throw new Error('GEMINI_API_KEY is not set in environment variables');
   }
@@ -245,6 +245,84 @@ IMPORTANT: Keep all text concise and portfolio-focused. Limit experience to top 
   }
 }
 
+// Rotate between multiple Gemini API keys, optionally using Redis to persist index across requests
+async function parseWithRotatingGeminiKeys(imageData: string[]): Promise<ResumeData> {
+  const rawKeys =
+    process.env.GEMINI_API_KEYS ||
+    process.env.GEMINI_API_KEY ||
+    '';
+
+  const keys = rawKeys
+    .split(',')
+    .map((k) => k.trim())
+    .filter(Boolean);
+
+  if (keys.length === 0) {
+    throw new Error('No Gemini API keys configured. Please set GEMINI_API_KEYS or GEMINI_API_KEY in your environment.');
+  }
+
+  const maxKeys = Math.min(3, keys.length);
+  const redisIndexKey = 'gemini:currentIndex';
+
+  // Determine starting index (from Redis when available)
+  let startIndex = 0;
+  if (redis) {
+    try {
+      const stored = await redis.get<number>(redisIndexKey);
+      if (typeof stored === 'number' && stored >= 0 && stored < maxKeys) {
+        startIndex = stored;
+      }
+    } catch {
+      // Ignore Redis errors and just fall back to 0
+    }
+  }
+
+  let lastError: any;
+
+  for (let offset = 0; offset < maxKeys; offset++) {
+    const index = (startIndex + offset) % maxKeys;
+    const apiKey = keys[index];
+
+    try {
+      const result = await parseResumeWithGemini(imageData, apiKey);
+
+      // On success, advance the index for the next request (round‑robin)
+      if (redis) {
+        try {
+          const nextIndex = (index + 1) % maxKeys;
+          await redis.set(redisIndexKey, nextIndex);
+        } catch {
+          // Non‑fatal if Redis set fails
+        }
+      }
+
+      return result;
+    } catch (error: any) {
+      lastError = error;
+      const message = String(error?.message || '').toLowerCase();
+      const status = (error as any)?.status || (error as any)?.statusCode;
+      const shouldRotate =
+        status === 429 ||
+        message.includes('rate limit') ||
+        message.includes('quota') ||
+        message.includes('resource_exhausted') ||
+        // Also rotate on invalid / missing API key so the next key can be tried
+        message.includes('invalid or missing gemini api key') ||
+        message.includes('api key');
+
+      // Only stop immediately if this is some other kind of error
+      if (!shouldRotate) {
+        throw error;
+      }
+
+      // Otherwise, try the next key (loop continues)
+      console.warn(`Gemini API rate-limited for key index ${index}, rotating to next key...`);
+    }
+  }
+
+  throw lastError || new Error('All configured Gemini API keys are exhausted. Please try again later.');
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -257,8 +335,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Parse with Gemini
-    const resumeData = await parseResumeWithGemini(images);
+    // Parse with Gemini using rotating API keys (Redis-backed when configured)
+    const resumeData = await parseWithRotatingGeminiKeys(images);
 
     return NextResponse.json({ success: true, data: resumeData });
   } catch (error: any) {
