@@ -1,6 +1,6 @@
 'use client';
 
-import { Sparkles, FileText, Edit, Eye, ArrowRight, LogIn } from 'lucide-react';
+import { FileText, Edit, Eye, ArrowRight, LogIn } from 'lucide-react';
 
 interface LandingPageProps {
   onGetStarted?: () => void;
@@ -16,6 +16,16 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
 
   return (
     <div className="min-h-screen bg-white dark:bg-[#121212]">
+      {/* Header */}
+      <header className="border-b border-[#E5E7EB] dark:border-[#333333]">
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-[#EAF9FA] to-[#DDE3FF] dark:from-[#1E3A39] dark:to-[#2A2D4A] border border-[#C9EAE6] dark:border-[#2A5A58]">
+            <span className="text-xl font-extrabold text-black dark:text-white tracking-tight" style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}>
+              ResuFolio
+            </span>
+          </div>
+        </div>
+      </header>
       {/* Hero Section */}
       <section className="relative min-h-screen flex items-center justify-center px-6 py-20 overflow-hidden">
         {/* Decorative background circles */}
@@ -48,12 +58,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
         </div>
         <div className="max-w-[1100px] mx-auto relative z-10">
           <div className="text-center mb-16">
-            {/* Icon */}
-            <div className="mb-8 flex justify-center">
-              <div className="w-20 h-20 rounded-full bg-[#EAF9FA] dark:bg-[#1E3A39] flex items-center justify-center">
-                <Sparkles size={36} className="text-black dark:text-white" />
-              </div>
-            </div>
+            
             {/* Main Headline */}
             <h1
               className="text-[clamp(2.5rem,8vw,5.5rem)] leading-[1.05] font-extrabold text-black dark:text-white tracking-[-1px] mb-6"

@@ -82,9 +82,11 @@ function EditPortfolioView({ initialData, onDataChange }: { initialData: ResumeD
       <div className="bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 px-6 py-4 z-20">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <h1 className="text-xl font-semibold text-black dark:text-zinc-50">
-              Portfolio Builder
-            </h1>
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-[#EAF9FA] to-[#DDE3FF] dark:from-[#1E3A39] dark:to-[#2A2D4A] border border-[#C9EAE6] dark:border-[#2A5A58]">
+              <span className="text-lg font-extrabold text-black dark:text-white tracking-tight" style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}>
+                ResuFolio
+              </span>
+            </div>
             <div className="h-6 w-px bg-zinc-300 dark:bg-zinc-700"></div>
             <span className="text-sm text-zinc-600 dark:text-zinc-400">
               Edit your portfolio and see it live
@@ -369,7 +371,12 @@ export default function UploadPage() {
     <div className="min-h-screen bg-white dark:bg-[#121212]">
       {/* Header */}
       <header className="border-b border-[#E5E7EB] dark:border-[#333333]">
-        <div className="max-w-7xl mx-auto px-6 py-4">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-[#EAF9FA] to-[#DDE3FF] dark:from-[#1E3A39] dark:to-[#2A2D4A] border border-[#C9EAE6] dark:border-[#2A5A58]">
+            <span className="text-lg font-extrabold text-black dark:text-white tracking-tight" style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}>
+              ResuFolio
+            </span>
+          </div>
           <a
             href="/"
             className="flex items-center gap-2 text-[#60646C] dark:text-[#A0A0A0] hover:text-black dark:hover:text-white transition-colors"

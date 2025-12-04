@@ -18,8 +18,8 @@ const plusJakartaSans = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Resume Parser",
-  description: "Upload your PDF resume and get a structured preview using AI",
+  title: "ResuFolio",
+  description: "Transform your resume into a beautiful portfolio with ResuFolio",
 };
 
 export default function RootLayout({

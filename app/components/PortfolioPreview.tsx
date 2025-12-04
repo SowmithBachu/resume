@@ -8,6 +8,7 @@ import {
   Github,
   Linkedin,
   ExternalLink,
+  Edit2,
 } from 'lucide-react';
 
 interface PortfolioData {
@@ -43,10 +44,28 @@ interface PortfolioData {
     description: string;
     technologies?: string;
   }>;
+  customElements?: Array<{
+    id: string;
+    type: string;
+    props?: any;
+    section?: string;
+  }>;
 }
 
 interface PortfolioPreviewProps {
   data: PortfolioData;
+  customElements?: Array<{
+    id: string;
+    type: string;
+    props?: any;
+    section?: string;
+  }>;
+  onDrop?: (e: React.DragEvent, sectionId: string) => void;
+  onDragOver?: (e: React.DragEvent, sectionId: string) => void;
+  onDragLeave?: (e: React.DragEvent) => void;
+  isCustomizing?: boolean;
+  activeDropZone?: string | null;
+  onEditElement?: (elementId: string) => void;
 }
 
 // Simple UI Components (replacing shadcn/ui)
@@ -138,12 +157,190 @@ function AvatarFallback({ children, className = '' }: { children: React.ReactNod
   return <div className={`flex h-full w-full items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 ${className}`}>{children}</div>;
 }
 
-export default function PortfolioPreview({ data }: PortfolioPreviewProps) {
+export default function PortfolioPreview({ 
+  data, 
+  customElements = [],
+  onDrop,
+  onDragOver,
+  onDragLeave,
+  isCustomizing = false,
+  activeDropZone = null,
+  onEditElement
+}: PortfolioPreviewProps) {
   const githubLink = (data.social?.github || data.githubUrl || '').trim();
   const linkedinLink = (data.linkedinUrl || '').trim();
   const twitterLink = (data.social?.twitter || '').trim();
   const instagramLink = (data.social?.instagram || '').trim();
   const avatarSrc = data.avatar;
+
+  // Import renderCustomElement dynamically to avoid circular dependency
+  const renderCustomElement = (element: { type: string; id: string; props?: any }) => {
+    // Simple inline rendering for custom elements
+    const { type, props = {} } = element;
+    
+    if (type === 'wizard') {
+      return (
+        <div className="w-full py-8 px-6 bg-white dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800 my-6">
+          <div className="flex items-center justify-between max-w-2xl mx-auto">
+            {Array.from({ length: props.steps || 3 }).map((_, index) => {
+              const stepNum = index + 1;
+              const isActive = stepNum === (props.currentStep || 1);
+              const isCompleted = stepNum < (props.currentStep || 1);
+              
+              return (
+                <div key={index} className="flex items-center flex-1">
+                  <div className="flex flex-col items-center flex-1">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all ${
+                      isCompleted 
+                        ? 'bg-blue-600 dark:bg-blue-400 border-blue-600 dark:border-blue-400 text-white' 
+                        : isActive 
+                        ? 'bg-blue-100 dark:bg-blue-900 border-blue-600 dark:border-blue-400 text-blue-600 dark:text-blue-400' 
+                        : 'bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-400'
+                    }`}>
+                      {isCompleted ? (
+                        <span className="text-white text-sm">✓</span>
+                      ) : (
+                        <span className="text-sm font-semibold">{stepNum}</span>
+                      )}
+                    </div>
+                    <span className={`mt-2 text-xs font-medium ${
+                      isActive || isCompleted 
+                        ? 'text-blue-600 dark:text-blue-400' 
+                        : 'text-gray-400'
+                    }`}>
+                      Step {stepNum}
+                    </span>
+                  </div>
+                  {index < (props.steps || 3) - 1 && (
+                    <div className={`flex-1 h-0.5 mx-2 ${
+                      isCompleted 
+                        ? 'bg-blue-600 dark:bg-blue-400' 
+                        : 'bg-gray-200 dark:bg-gray-700'
+                    }`} />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+    
+    if (type === 'steps') {
+      const items = props.items || ['Step 1', 'Step 2', 'Step 3'];
+      return (
+        <div className="w-full py-6 px-6 bg-white dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800 my-6">
+          <div className="space-y-4">
+            {items.map((item: string, index: number) => (
+              <div key={index} className="flex items-start gap-4">
+                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-600 dark:bg-blue-400 text-white flex items-center justify-center text-sm font-semibold">
+                  {index + 1}
+                </div>
+                <div className="flex-1 pt-1">
+                  <p className="text-base font-medium text-gray-900 dark:text-gray-100">{item}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+    
+    if (type === 'timeline') {
+      const items = props.items || ['Event 1', 'Event 2', 'Event 3'];
+      return (
+        <div className="w-full py-6 px-6 bg-white dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800 my-6">
+          <div className="relative">
+            <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-gray-200 dark:bg-gray-700"></div>
+            <div className="space-y-6">
+              {items.map((item: string, index: number) => (
+                <div key={index} className="relative flex items-start gap-4">
+                  <div className="relative z-10 flex-shrink-0 w-8 h-8 rounded-full bg-blue-600 dark:bg-blue-400 border-4 border-white dark:border-gray-950"></div>
+                  <div className="flex-1 pt-1">
+                    <p className="text-base font-medium text-gray-900 dark:text-gray-100">{item}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+    
+    if (type === 'stats') {
+      const stats = props.stats || [
+        { label: 'Projects', value: '50+' },
+        { label: 'Clients', value: '30+' },
+        { label: 'Experience', value: '5y' }
+      ];
+      return (
+        <div className="w-full py-6 px-6 bg-white dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800 my-6">
+          <div className="grid grid-cols-3 gap-6">
+            {stats.map((stat: { label: string; value: string }, index: number) => (
+              <div key={index} className="text-center">
+                <div className="text-3xl font-bold text-blue-600 dark:text-blue-400 mb-1">
+                  {stat.value}
+                </div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">
+                  {stat.label}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+    
+    if (type === 'achievements') {
+      const items = props.items || ['Achievement 1', 'Achievement 2', 'Achievement 3'];
+      return (
+        <div className="w-full py-6 px-6 bg-white dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800 my-6">
+          <div className="space-y-3">
+            {items.map((item: string, index: number) => (
+              <div key={index} className="flex items-center gap-3">
+                <span className="text-blue-600 dark:text-blue-400 text-xl">🏆</span>
+                <p className="text-base text-gray-900 dark:text-gray-100">{item}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+    
+    if (type === 'progress') {
+      const items = props.items || [
+        { label: 'Skill 1', progress: 90 },
+        { label: 'Skill 2', progress: 75 },
+        { label: 'Skill 3', progress: 60 }
+      ];
+      return (
+        <div className="w-full py-6 px-6 bg-white dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800 my-6">
+          <div className="space-y-4">
+            {items.map((item: { label: string; progress: number }, index: number) => (
+              <div key={index}>
+                <div className="flex justify-between mb-2">
+                  <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{item.label}</span>
+                  <span className="text-sm text-gray-600 dark:text-gray-400">{item.progress}%</span>
+                </div>
+                <div className="w-full h-2 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-blue-600 dark:bg-blue-400 transition-all duration-500"
+                    style={{ width: `${item.progress}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+    
+    return null;
+  };
+
+  const getCustomElementsForSection = (sectionId: string) => {
+    return customElements.filter(el => el.section === sectionId);
+  };
 
   return (
     <div className="min-h-full bg-white dark:bg-gray-950">
@@ -181,7 +378,51 @@ export default function PortfolioPreview({ data }: PortfolioPreviewProps) {
       </header>
       <main className="container py-10 md:py-16 max-w-7xl mx-auto px-6">
         {/* Hero Section */}
-        <section className="py-16 md:py-20 lg:py-24 space-y-10">
+        <section 
+          id="hero"
+          className={`py-16 md:py-20 lg:py-24 space-y-10 relative transition-all ${
+            isCustomizing && activeDropZone === 'hero' 
+              ? 'ring-2 ring-blue-500 ring-dashed bg-blue-50/50 dark:bg-blue-950/20' 
+              : ''
+          }`}
+          onDrop={isCustomizing ? (e) => onDrop?.(e, 'hero') : undefined}
+          onDragOver={isCustomizing ? (e) => onDragOver?.(e, 'hero') : undefined}
+          onDragLeave={isCustomizing ? onDragLeave : undefined}
+        >
+          {isCustomizing && activeDropZone === 'hero' && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+              <div className="bg-blue-500/10 border-2 border-dashed border-blue-500 rounded-lg px-8 py-4 backdrop-blur-sm">
+                <p className="text-blue-600 dark:text-blue-400 font-semibold">Drop element here</p>
+              </div>
+            </div>
+          )}
+          {getCustomElementsForSection('hero').map((el) => (
+            <div key={el.id} className="relative group">
+              {isCustomizing && (
+                <>
+                  <button
+                    onClick={() => onEditElement?.(el.id)}
+                    className="absolute -top-2 -left-2 z-20 w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center hover:bg-blue-600 shadow-md"
+                    title="Edit element"
+                  >
+                    <Edit2 className="w-3 h-3" />
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (typeof window !== 'undefined') {
+                        window.dispatchEvent(new CustomEvent('removeElement', { detail: { id: el.id } }));
+                      }
+                    }}
+                    className="absolute -top-2 -right-2 z-20 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600 shadow-md"
+                    title="Remove element"
+                  >
+                    ×
+                  </button>
+                </>
+              )}
+              {renderCustomElement(el)}
+            </div>
+          ))}
           <div className="flex flex-col md:flex-row gap-10 items-center">
             <div className="md:w-2/3 space-y-7">
               <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight leading-tight">
@@ -239,7 +480,51 @@ export default function PortfolioPreview({ data }: PortfolioPreviewProps) {
         </section>
 
         {/* About Section */}
-        <section id="about" className="py-16 scroll-mt-20">
+        <section 
+          id="about" 
+          className={`py-16 scroll-mt-20 relative transition-all ${
+            isCustomizing && activeDropZone === 'about' 
+              ? 'ring-2 ring-blue-500 ring-dashed bg-blue-50/50 dark:bg-blue-950/20' 
+              : ''
+          }`}
+          onDrop={isCustomizing ? (e) => onDrop?.(e, 'about') : undefined}
+          onDragOver={isCustomizing ? (e) => onDragOver?.(e, 'about') : undefined}
+          onDragLeave={isCustomizing ? onDragLeave : undefined}
+        >
+          {isCustomizing && activeDropZone === 'about' && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+              <div className="bg-blue-500/10 border-2 border-dashed border-blue-500 rounded-lg px-8 py-4 backdrop-blur-sm">
+                <p className="text-blue-600 dark:text-blue-400 font-semibold">Drop element here</p>
+              </div>
+            </div>
+          )}
+          {getCustomElementsForSection('about').map((el) => (
+            <div key={el.id} className="mb-6 relative group">
+              {isCustomizing && (
+                <>
+                  <button
+                    onClick={() => onEditElement?.(el.id)}
+                    className="absolute -top-2 -left-2 z-20 w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center hover:bg-blue-600 shadow-md"
+                    title="Edit element"
+                  >
+                    <Edit2 className="w-3 h-3" />
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (typeof window !== 'undefined') {
+                        window.dispatchEvent(new CustomEvent('removeElement', { detail: { id: el.id } }));
+                      }
+                    }}
+                    className="absolute -top-2 -right-2 z-20 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600 shadow-md"
+                    title="Remove element"
+                  >
+                    ×
+                  </button>
+                </>
+              )}
+              {renderCustomElement(el)}
+            </div>
+          ))}
           <div className="space-y-8">
             <div className="flex items-center space-x-4">
               <h2 className="text-4xl md:text-5xl font-extrabold tracking-tight">About Me</h2>
@@ -278,7 +563,51 @@ export default function PortfolioPreview({ data }: PortfolioPreviewProps) {
 
         {/* Experience Section */}
         {data.experience && data.experience.length > 0 && (
-          <section id="experience" className="py-16 scroll-mt-20">
+          <section 
+            id="experience" 
+            className={`py-16 scroll-mt-20 relative transition-all ${
+              isCustomizing && activeDropZone === 'experience' 
+                ? 'ring-2 ring-blue-500 ring-dashed bg-blue-50/50 dark:bg-blue-950/20' 
+                : ''
+            }`}
+            onDrop={isCustomizing ? (e) => onDrop?.(e, 'experience') : undefined}
+            onDragOver={isCustomizing ? (e) => onDragOver?.(e, 'experience') : undefined}
+            onDragLeave={isCustomizing ? onDragLeave : undefined}
+          >
+            {isCustomizing && activeDropZone === 'experience' && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+                <div className="bg-blue-500/10 border-2 border-dashed border-blue-500 rounded-lg px-8 py-4 backdrop-blur-sm">
+                  <p className="text-blue-600 dark:text-blue-400 font-semibold">Drop element here</p>
+                </div>
+              </div>
+            )}
+            {getCustomElementsForSection('experience').map((el) => (
+              <div key={el.id} className="mb-6 relative group">
+                {isCustomizing && (
+                  <>
+                    <button
+                      onClick={() => onEditElement?.(el.id)}
+                      className="absolute -top-2 -left-2 z-20 w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center hover:bg-blue-600 shadow-md"
+                      title="Edit element"
+                    >
+                      <Edit2 className="w-3 h-3" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (typeof window !== 'undefined') {
+                          window.dispatchEvent(new CustomEvent('removeElement', { detail: { id: el.id } }));
+                        }
+                      }}
+                      className="absolute -top-2 -right-2 z-20 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600 shadow-md"
+                      title="Remove element"
+                    >
+                      ×
+                    </button>
+                  </>
+                )}
+                {renderCustomElement(el)}
+              </div>
+            ))}
             <div className="space-y-8">
               <div className="flex items-center space-x-4">
                 <h2 className="text-4xl md:text-5xl font-extrabold tracking-tight">Work Experience</h2>
@@ -301,7 +630,51 @@ export default function PortfolioPreview({ data }: PortfolioPreviewProps) {
 
         {/* Projects Section */}
         {data.projects && data.projects.length > 0 && (
-          <section id="projects" className="py-16 scroll-mt-20">
+          <section 
+            id="projects" 
+            className={`py-16 scroll-mt-20 relative transition-all ${
+              isCustomizing && activeDropZone === 'projects' 
+                ? 'ring-2 ring-blue-500 ring-dashed bg-blue-50/50 dark:bg-blue-950/20' 
+                : ''
+            }`}
+            onDrop={isCustomizing ? (e) => onDrop?.(e, 'projects') : undefined}
+            onDragOver={isCustomizing ? (e) => onDragOver?.(e, 'projects') : undefined}
+            onDragLeave={isCustomizing ? onDragLeave : undefined}
+          >
+            {isCustomizing && activeDropZone === 'projects' && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+                <div className="bg-blue-500/10 border-2 border-dashed border-blue-500 rounded-lg px-8 py-4 backdrop-blur-sm">
+                  <p className="text-blue-600 dark:text-blue-400 font-semibold">Drop element here</p>
+                </div>
+              </div>
+            )}
+            {getCustomElementsForSection('projects').map((el) => (
+              <div key={el.id} className="mb-6 relative group">
+                {isCustomizing && (
+                  <>
+                    <button
+                      onClick={() => onEditElement?.(el.id)}
+                      className="absolute -top-2 -left-2 z-20 w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center hover:bg-blue-600 shadow-md"
+                      title="Edit element"
+                    >
+                      <Edit2 className="w-3 h-3" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (typeof window !== 'undefined') {
+                          window.dispatchEvent(new CustomEvent('removeElement', { detail: { id: el.id } }));
+                        }
+                      }}
+                      className="absolute -top-2 -right-2 z-20 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600 shadow-md"
+                      title="Remove element"
+                    >
+                      ×
+                    </button>
+                  </>
+                )}
+                {renderCustomElement(el)}
+              </div>
+            ))}
             <div className="space-y-8">
               <div className="flex items-center space-x-4">
                 <h2 className="text-4xl md:text-5xl font-extrabold tracking-tight">Projects</h2>
@@ -323,7 +696,51 @@ export default function PortfolioPreview({ data }: PortfolioPreviewProps) {
 
         {/* Skills Section */}
         {data.skills && data.skills.length > 0 && (
-          <section id="skills" className="py-16 scroll-mt-20">
+          <section 
+            id="skills" 
+            className={`py-16 scroll-mt-20 relative transition-all ${
+              isCustomizing && activeDropZone === 'skills' 
+                ? 'ring-2 ring-blue-500 ring-dashed bg-blue-50/50 dark:bg-blue-950/20' 
+                : ''
+            }`}
+            onDrop={isCustomizing ? (e) => onDrop?.(e, 'skills') : undefined}
+            onDragOver={isCustomizing ? (e) => onDragOver?.(e, 'skills') : undefined}
+            onDragLeave={isCustomizing ? onDragLeave : undefined}
+          >
+            {isCustomizing && activeDropZone === 'skills' && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+                <div className="bg-blue-500/10 border-2 border-dashed border-blue-500 rounded-lg px-8 py-4 backdrop-blur-sm">
+                  <p className="text-blue-600 dark:text-blue-400 font-semibold">Drop element here</p>
+                </div>
+              </div>
+            )}
+            {getCustomElementsForSection('skills').map((el) => (
+              <div key={el.id} className="mb-6 relative group">
+                {isCustomizing && (
+                  <>
+                    <button
+                      onClick={() => onEditElement?.(el.id)}
+                      className="absolute -top-2 -left-2 z-20 w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center hover:bg-blue-600 shadow-md"
+                      title="Edit element"
+                    >
+                      <Edit2 className="w-3 h-3" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (typeof window !== 'undefined') {
+                          window.dispatchEvent(new CustomEvent('removeElement', { detail: { id: el.id } }));
+                        }
+                      }}
+                      className="absolute -top-2 -right-2 z-20 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600 shadow-md"
+                      title="Remove element"
+                    >
+                      ×
+                    </button>
+                  </>
+                )}
+                {renderCustomElement(el)}
+              </div>
+            ))}
             <div className="space-y-8">
               <div className="flex items-center space-x-4">
                 <h2 className="text-4xl md:text-5xl font-extrabold tracking-tight">Technical Skills</h2>
@@ -347,7 +764,51 @@ export default function PortfolioPreview({ data }: PortfolioPreviewProps) {
 
         {/* Education Section */}
         {data.education && data.education.length > 0 && (
-          <section id="education" className="py-16 scroll-mt-20">
+          <section 
+            id="education" 
+            className={`py-16 scroll-mt-20 relative transition-all ${
+              isCustomizing && activeDropZone === 'education' 
+                ? 'ring-2 ring-blue-500 ring-dashed bg-blue-50/50 dark:bg-blue-950/20' 
+                : ''
+            }`}
+            onDrop={isCustomizing ? (e) => onDrop?.(e, 'education') : undefined}
+            onDragOver={isCustomizing ? (e) => onDragOver?.(e, 'education') : undefined}
+            onDragLeave={isCustomizing ? onDragLeave : undefined}
+          >
+            {isCustomizing && activeDropZone === 'education' && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+                <div className="bg-blue-500/10 border-2 border-dashed border-blue-500 rounded-lg px-8 py-4 backdrop-blur-sm">
+                  <p className="text-blue-600 dark:text-blue-400 font-semibold">Drop element here</p>
+                </div>
+              </div>
+            )}
+            {getCustomElementsForSection('education').map((el) => (
+              <div key={el.id} className="mb-6 relative group">
+                {isCustomizing && (
+                  <>
+                    <button
+                      onClick={() => onEditElement?.(el.id)}
+                      className="absolute -top-2 -left-2 z-20 w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center hover:bg-blue-600 shadow-md"
+                      title="Edit element"
+                    >
+                      <Edit2 className="w-3 h-3" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (typeof window !== 'undefined') {
+                          window.dispatchEvent(new CustomEvent('removeElement', { detail: { id: el.id } }));
+                        }
+                      }}
+                      className="absolute -top-2 -right-2 z-20 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600 shadow-md"
+                      title="Remove element"
+                    >
+                      ×
+                    </button>
+                  </>
+                )}
+                {renderCustomElement(el)}
+              </div>
+            ))}
             <div className="space-y-8">
               <div className="flex items-center space-x-4">
                 <h2 className="text-4xl md:text-5xl font-extrabold tracking-tight">Education</h2>
@@ -373,7 +834,51 @@ export default function PortfolioPreview({ data }: PortfolioPreviewProps) {
         )}
 
         {/* Contact Section */}
-        <section id="contact" className="py-16 scroll-mt-20">
+        <section 
+          id="contact" 
+          className={`py-16 scroll-mt-20 relative transition-all ${
+            isCustomizing && activeDropZone === 'contact' 
+              ? 'ring-2 ring-blue-500 ring-dashed bg-blue-50/50 dark:bg-blue-950/20' 
+              : ''
+          }`}
+          onDrop={isCustomizing ? (e) => onDrop?.(e, 'contact') : undefined}
+          onDragOver={isCustomizing ? (e) => onDragOver?.(e, 'contact') : undefined}
+          onDragLeave={isCustomizing ? onDragLeave : undefined}
+        >
+          {isCustomizing && activeDropZone === 'contact' && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+              <div className="bg-blue-500/10 border-2 border-dashed border-blue-500 rounded-lg px-8 py-4 backdrop-blur-sm">
+                <p className="text-blue-600 dark:text-blue-400 font-semibold">Drop element here</p>
+              </div>
+            </div>
+          )}
+          {getCustomElementsForSection('contact').map((el) => (
+            <div key={el.id} className="mb-6 relative group">
+              {isCustomizing && (
+                <>
+                  <button
+                    onClick={() => onEditElement?.(el.id)}
+                    className="absolute -top-2 -left-2 z-20 w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center hover:bg-blue-600 shadow-md"
+                    title="Edit element"
+                  >
+                    <Edit2 className="w-3 h-3" />
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (typeof window !== 'undefined') {
+                        window.dispatchEvent(new CustomEvent('removeElement', { detail: { id: el.id } }));
+                      }
+                    }}
+                    className="absolute -top-2 -right-2 z-20 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600 shadow-md"
+                    title="Remove element"
+                  >
+                    ×
+                  </button>
+                </>
+              )}
+              {renderCustomElement(el)}
+            </div>
+          ))}
           <div className="space-y-8">
             <div className="flex items-center space-x-4">
               <h2 className="text-4xl md:text-5xl font-extrabold tracking-tight">Get In Touch</h2>

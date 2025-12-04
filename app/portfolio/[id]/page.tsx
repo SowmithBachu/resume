@@ -38,6 +38,12 @@ interface PortfolioData {
     description: string;
     technologies?: string;
   }>;
+  customElements?: Array<{
+    id: string;
+    type: string;
+    props?: any;
+    section?: string;
+  }>;
 }
 
 function PortfolioContent() {
@@ -136,7 +142,7 @@ function PortfolioContent() {
 
   return (
     <div className="min-h-screen bg-white dark:bg-[#121212]">
-      <PortfolioPreview data={data} />
+      <PortfolioPreview data={data} customElements={data.customElements} />
     </div>
   );
 }
