@@ -1,18 +1,12 @@
 'use client';
 
-import { FileText, Edit, Eye, ArrowRight, LogIn } from 'lucide-react';
+import { FileText, Edit, Eye, LogIn } from 'lucide-react';
 
 interface LandingPageProps {
   onGetStarted?: () => void;
 }
 
 export default function LandingPage({ onGetStarted }: LandingPageProps) {
-  const handleGetStarted = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    if (onGetStarted) {
-      e.preventDefault();
-      onGetStarted();
-    }
-  };
 
   return (
     <div className="min-h-screen bg-white dark:bg-[#121212]">
@@ -93,14 +87,6 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
             </p>
             {/* CTA Buttons */}
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <a
-                href="/upload"
-                className="inline-flex items-center gap-3 px-8 py-4 bg-black dark:bg-white text-white dark:text-black rounded-xl text-[18px] font-semibold hover:opacity-90 transition-opacity"
-                style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}
-              >
-                Get Started
-                <ArrowRight size={20} />
-              </a>
               <a
                 href="/api/auth/google"
                 className="inline-flex items-center gap-3 px-6 py-3 border border-[#D0D0D0] dark:border-[#3A3A3A] rounded-xl text-[16px] font-semibold text-black dark:text-white hover:bg-[#F5F5F5] dark:hover:bg-[#1F1F1F] transition-colors"
