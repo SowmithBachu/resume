@@ -115,13 +115,13 @@ IMPORTANT: Keep all text concise and portfolio-focused. Limit experience to top 
       },
       body: JSON.stringify({
         model: modelName,
-        temperature: 0.2,
-        max_tokens: 900,
+        temperature: 0.1,
+        max_tokens: 2000,
         messages: [
           {
             role: 'system',
             content:
-              'You are a resume parser that returns strict JSON matching the requested schema. Do not include any markdown fences or explanations.',
+              'You are a resume parser that returns ONLY valid JSON matching the requested schema. Do not include any markdown code fences (```), explanations, or text outside the JSON object. Return the JSON object directly without any wrapping.',
           },
           {
             role: 'user',
@@ -145,6 +145,16 @@ IMPORTANT: Keep all text concise and portfolio-focused. Limit experience to top 
 
     const data = await response.json();
 
+    // Check for API errors in response
+    if (data.error) {
+      throw new Error(`OpenRouter API error: ${data.error.message || JSON.stringify(data.error)}`);
+    }
+
+    if (!data.choices || !Array.isArray(data.choices) || data.choices.length === 0) {
+      console.error('Unexpected API response structure:', JSON.stringify(data, null, 2));
+      throw new Error('Unexpected response format from AI service');
+    }
+
     const content = data?.choices?.[0]?.message?.content;
     const text =
       Array.isArray(content) && content.length > 0
@@ -154,47 +164,88 @@ IMPORTANT: Keep all text concise and portfolio-focused. Limit experience to top 
       throw new Error('Empty response from AI model');
     }
 
+    // Log full response for debugging (truncated in production)
+    console.log('AI Response received:', text.substring(0, 1000));
+
     let jsonText = text.trim();
 
+    // Remove markdown code blocks
     if (jsonText.startsWith('```json')) {
       jsonText = jsonText.replace(/^```json\n?/i, '').replace(/\n?```$/i, '');
     } else if (jsonText.startsWith('```')) {
       jsonText = jsonText.replace(/^```\n?/i, '').replace(/\n?```$/i, '');
     }
 
-    const extractJson = (input: string) => {
-      // try simple { ... } match first
-      const simple = input.match(/\{[\s\S]*\}/);
-      if (simple) return simple[0];
+    // Remove any leading/trailing whitespace or newlines
+    jsonText = jsonText.trim();
 
-      // fallback: stack-based brace matching to recover largest JSON-like block
-      let start = -1;
+    const extractJson = (input: string) => {
+      // First, try to find JSON object boundaries more accurately
+      // Look for the first { and match it with the last }
+      const firstBrace = input.indexOf('{');
+      if (firstBrace === -1) {
+        return input;
+      }
+
+      // Use stack-based matching to find the matching closing brace
       let depth = 0;
-      for (let i = 0; i < input.length; i++) {
+      let lastBrace = -1;
+      for (let i = firstBrace; i < input.length; i++) {
         const ch = input[i];
         if (ch === '{') {
-          if (depth === 0) start = i;
           depth++;
         } else if (ch === '}') {
           depth--;
-          if (depth === 0 && start !== -1) {
-            return input.slice(start, i + 1);
+          if (depth === 0) {
+            lastBrace = i;
+            break;
           }
         }
       }
+
+      if (lastBrace !== -1) {
+        return input.slice(firstBrace, lastBrace + 1);
+      }
+
+      // Fallback: try regex match
+      const simple = input.match(/\{[\s\S]*\}/);
+      if (simple) return simple[0];
+
       return input;
     };
 
     jsonText = extractJson(jsonText);
+    jsonText = jsonText.trim();
+
+    // Try to fix common JSON issues
+    // Remove any trailing commas before closing braces/brackets
+    jsonText = jsonText.replace(/,(\s*[}\]])/g, '$1');
+    
+    // Fix unescaped quotes in strings (basic attempt)
+    // This is tricky, so we'll be conservative
 
     let parsedData;
     try {
       parsedData = JSON.parse(jsonText);
     } catch (parseError: any) {
-      console.error('JSON Parse Error:', parseError);
-      console.error('Raw response (first 500 chars):', text.substring(0, 500));
-      console.error('Extracted JSON candidate (first 500 chars):', jsonText.substring(0, 500));
-      throw new Error('Failed to parse AI response. Please retry with a clearer PDF or try again in a moment.');
+      console.error('JSON Parse Error:', parseError.message);
+      console.error('Raw response (first 1000 chars):', text.substring(0, 1000));
+      console.error('Extracted JSON candidate (first 1000 chars):', jsonText.substring(0, 1000));
+      console.error('Full extracted JSON:', jsonText);
+      
+      // Try one more time with more aggressive cleaning
+      try {
+        // Remove any text before first { and after last }
+        const cleaned = jsonText.replace(/^[^{]*/, '').replace(/[^}]*$/, '');
+        if (cleaned !== jsonText) {
+          parsedData = JSON.parse(cleaned);
+          console.log('Successfully parsed after aggressive cleaning');
+        } else {
+          throw parseError;
+        }
+      } catch (retryError) {
+        throw new Error('Failed to parse AI response. Please retry with a clearer PDF or try again in a moment.');
+      }
     }
 
     if (!parsedData || typeof parsedData !== 'object') {
@@ -232,6 +283,11 @@ IMPORTANT: Keep all text concise and portfolio-focused. Limit experience to top 
       throw err;
     }
     if (message.includes('json') || message.includes('parse')) {
+      // Log the actual error for debugging
+      console.error('Parse error details:', {
+        error: error.message,
+        stack: error.stack,
+      });
       throw new Error('Failed to parse AI response. The resume format might be too complex. Please try with a clearer PDF.');
     }
 
@@ -269,4 +325,5 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
 
