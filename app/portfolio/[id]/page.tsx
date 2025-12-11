@@ -1,12 +1,21 @@
 'use client';
 
-import { useEffect, useState, Suspense } from 'react';
+import { useEffect, useState, Suspense, lazy } from 'react';
 import { useParams } from 'next/navigation';
-import PortfolioPreview from '../../components/PortfolioPreview';
-import PortfolioPreview1 from '../../components/PortfolioPreview1';
-import PortfolioPreview3 from '../../components/PortfolioPreview3';
 import { Loader, Download } from 'lucide-react';
-import { downloadPortfolioHTML } from '../../utils/generatePortfolioHTML';
+import { checkProStatus } from '@/lib/check-pro';
+import ProPaywallModal from '../../components/ProPaywallModal';
+
+// Lazy load heavy portfolio preview components
+const PortfolioPreview = lazy(() => import('../../components/PortfolioPreview'));
+const PortfolioPreview1 = lazy(() => import('../../components/PortfolioPreview1'));
+const PortfolioPreview3 = lazy(() => import('../../components/PortfolioPreview3'));
+
+// Dynamic import for download function
+const handleDownload = async (data: PortfolioData) => {
+  const { downloadPortfolioHTML } = await import('../../utils/generatePortfolioHTML');
+  downloadPortfolioHTML(data, data.customElements || [], data.template);
+};
 
 interface PortfolioData {
   name?: string;
@@ -55,6 +64,8 @@ function PortfolioContent() {
   const portfolioId = params?.id as string;
   const [data, setData] = useState<PortfolioData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isPro, setIsPro] = useState(false);
+  const [showPaywall, setShowPaywall] = useState(false);
 
   useEffect(() => {
     if (!portfolioId || typeof window === 'undefined') {
@@ -114,6 +125,25 @@ function PortfolioContent() {
     loadPortfolio();
   }, [portfolioId]);
 
+  // Check Pro status on mount
+  useEffect(() => {
+    const checkPro = async () => {
+      const proStatus = await checkProStatus();
+      setIsPro(proStatus);
+    };
+    checkPro();
+  }, []);
+
+  const handleDownloadSource = () => {
+    if (!isPro) {
+      setShowPaywall(true);
+      return;
+    }
+    if (data) {
+      handleDownload(data);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-white dark:bg-[#121212] flex items-center justify-center">
@@ -146,22 +176,35 @@ function PortfolioContent() {
 
   return (
     <div className="min-h-screen bg-white dark:bg-[#121212]">
-      {data.template === '3' ? (
-        <PortfolioPreview3 data={data} customElements={data.customElements} />
-      ) : data.template === '2' ? (
-        <PortfolioPreview1 data={data} customElements={data.customElements} />
-      ) : (
-        <PortfolioPreview data={data} customElements={data.customElements} />
-      )}
+      <Suspense fallback={
+        <div className="min-h-screen flex items-center justify-center">
+          <Loader className="animate-spin text-black dark:text-white" size={48} />
+        </div>
+      }>
+        {data.template === '3' ? (
+          <PortfolioPreview3 data={data} customElements={data.customElements} />
+        ) : data.template === '2' ? (
+          <PortfolioPreview1 data={data} customElements={data.customElements} />
+        ) : (
+          <PortfolioPreview data={data} customElements={data.customElements} />
+        )}
+      </Suspense>
       <div className="fixed bottom-8 right-8 z-50">
         <button
-          onClick={() => downloadPortfolioHTML(data, data.customElements || [], data.template)}
+          onClick={handleDownloadSource}
           className="flex items-center gap-2 px-5 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all shadow-lg hover:shadow-xl font-medium"
         >
           <Download className="w-5 h-5" />
           Download Source
         </button>
       </div>
+
+      {/* Pro Paywall Modal */}
+      <ProPaywallModal
+        isOpen={showPaywall}
+        onClose={() => setShowPaywall(false)}
+        feature="download"
+      />
     </div>
   );
 }

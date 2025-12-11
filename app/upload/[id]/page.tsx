@@ -1,13 +1,22 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, lazy, Suspense } from 'react';
 import { useParams } from 'next/navigation';
 import { Share2, Check, Copy, X, Sparkles, Download } from 'lucide-react';
 import ResumePreview from '../../components/ResumePreview';
-import PortfolioPreview from '../../components/PortfolioPreview';
-import PortfolioPreview1 from '../../components/PortfolioPreview1';
-import PortfolioPreview3 from '../../components/PortfolioPreview3';
-import { downloadPortfolioHTML } from '../../utils/generatePortfolioHTML';
+import { checkProStatus } from '@/lib/check-pro';
+import ProPaywallModal from '../../components/ProPaywallModal';
+
+// Lazy load heavy portfolio preview components
+const PortfolioPreview = lazy(() => import('../../components/PortfolioPreview'));
+const PortfolioPreview1 = lazy(() => import('../../components/PortfolioPreview1'));
+const PortfolioPreview3 = lazy(() => import('../../components/PortfolioPreview3'));
+
+// Dynamic import for download function to reduce initial bundle
+const handleDownload = async (portfolioData: ResumeData) => {
+  const { downloadPortfolioHTML } = await import('../../utils/generatePortfolioHTML');
+  downloadPortfolioHTML(portfolioData, portfolioData.customElements || [], portfolioData.template);
+};
 
 interface ResumeData {
   name?: string;
@@ -48,6 +57,10 @@ function EditPortfolioView({ initialData, portfolioId }: { initialData: ResumeDa
   const [split, setSplit] = useState(50); // percentage width of the left panel
   const [showShareModal, setShowShareModal] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [isPro, setIsPro] = useState(false);
+  const [checkingPro, setCheckingPro] = useState(true);
+  const [showPaywall, setShowPaywall] = useState(false);
+  const [paywallFeature, setPaywallFeature] = useState<'share' | 'download' | 'template'>('share');
   const containerRef = useRef<HTMLDivElement | null>(null);
   const isDraggingRef = useRef(false);
 
@@ -55,6 +68,21 @@ function EditPortfolioView({ initialData, portfolioId }: { initialData: ResumeDa
   useEffect(() => {
     setPortfolioData(initialData);
   }, [initialData]);
+
+  // Check Pro status on mount
+  useEffect(() => {
+    const checkPro = async () => {
+      const proStatus = await checkProStatus();
+      setIsPro(proStatus);
+      setCheckingPro(false);
+      
+      // If user is not Pro and has a premium template, reset to template 1
+      if (!proStatus && (portfolioData.template === '2' || portfolioData.template === '3')) {
+        setPortfolioData({ ...portfolioData, template: '1' });
+      }
+    };
+    checkPro();
+  }, []);
 
   const handleDataChange = async (data: ResumeData) => {
     setPortfolioData(data);
@@ -120,7 +148,30 @@ function EditPortfolioView({ initialData, portfolioId }: { initialData: ResumeDa
   };
 
   const handleOpenShareModal = () => {
+    if (!isPro) {
+      setPaywallFeature('share');
+      setShowPaywall(true);
+      return;
+    }
     setShowShareModal(true);
+  };
+
+  const handleDownloadSource = () => {
+    if (!isPro) {
+      setPaywallFeature('download');
+      setShowPaywall(true);
+      return;
+    }
+    handleDownload(portfolioData);
+  };
+
+  const handleTemplateChange = async (newTemplate: '1' | '2' | '3') => {
+    if ((newTemplate === '2' || newTemplate === '3') && !isPro) {
+      setPaywallFeature('template');
+      setShowPaywall(true);
+      return;
+    }
+    await handleDataChange({ ...portfolioData, template: newTemplate });
   };
 
   const handleCloseShareModal = () => {
@@ -182,7 +233,7 @@ function EditPortfolioView({ initialData, portfolioId }: { initialData: ResumeDa
             <button
               onClick={(e) => {
                 e.preventDefault();
-                downloadPortfolioHTML(portfolioData, portfolioData.customElements || [], portfolioData.template);
+                handleDownloadSource();
               }}
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-green-600 dark:bg-green-500 text-white hover:bg-green-700 dark:hover:bg-green-600 transition-colors shadow-sm hover:shadow-md"
               style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}
@@ -233,13 +284,17 @@ function EditPortfolioView({ initialData, portfolioId }: { initialData: ResumeDa
                     value={portfolioData.template || '1'}
                     onChange={(e) => {
                       const newTemplate = e.target.value as '1' | '2' | '3';
-                      handleDataChange({ ...portfolioData, template: newTemplate });
+                      handleTemplateChange(newTemplate);
                     }}
                     className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm font-medium text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="1">Template 1 (Minimal)</option>
-                    <option value="2">Template 2 (Bold)</option>
-                    <option value="3">Template 3 (Modern)</option>
+                    <option value="2" disabled={!isPro}>
+                      Template 2 (Bold) {!isPro && '🔒 Pro'}
+                    </option>
+                    <option value="3" disabled={!isPro}>
+                      Template 3 (Modern) {!isPro && '🔒 Pro'}
+                    </option>
                   </select>
                 </div>
               </div>
@@ -273,13 +328,15 @@ function EditPortfolioView({ initialData, portfolioId }: { initialData: ResumeDa
           style={{ width: `${100 - split}%`, minWidth: '20%', maxWidth: '80%' }}
         >
           <div className="flex-1 overflow-y-auto">
-            {portfolioData.template === '3' ? (
-              <PortfolioPreview3 data={portfolioData} />
-            ) : portfolioData.template === '2' ? (
-              <PortfolioPreview1 data={portfolioData} />
-            ) : (
-              <PortfolioPreview data={portfolioData} />
-            )}
+            <Suspense fallback={<div className="flex items-center justify-center h-full text-zinc-500">Loading preview...</div>}>
+              {portfolioData.template === '3' ? (
+                <PortfolioPreview3 data={portfolioData} />
+              ) : portfolioData.template === '2' ? (
+                <PortfolioPreview1 data={portfolioData} />
+              ) : (
+                <PortfolioPreview data={portfolioData} />
+              )}
+            </Suspense>
           </div>
         </div>
       </div>
@@ -337,6 +394,13 @@ function EditPortfolioView({ initialData, portfolioId }: { initialData: ResumeDa
           </div>
         </div>
       )}
+
+      {/* Pro Paywall Modal */}
+      <ProPaywallModal
+        isOpen={showPaywall}
+        onClose={() => setShowPaywall(false)}
+        feature={paywallFeature}
+      />
     </div>
   );
 }

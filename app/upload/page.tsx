@@ -165,7 +165,66 @@ export default function UploadPage() {
   const [resumeData, setResumeData] = useState<ResumeData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [checkingExisting, setCheckingExisting] = useState(true);
+  const [hasExistingPortfolio, setHasExistingPortfolio] = useState(false);
+  const [existingPortfolioId, setExistingPortfolioId] = useState<string | null>(null);
+  const [isPro, setIsPro] = useState(false);
   const router = useRouter();
+
+  // Check if user already has a portfolio on mount
+  useEffect(() => {
+    const checkExistingPortfolio = async () => {
+      try {
+        const cookies = document.cookie.split(';');
+        const googleUserCookie = cookies.find(c => c.trim().startsWith('google_user='));
+        
+        if (!googleUserCookie) {
+          setCheckingExisting(false);
+          return;
+        }
+
+        let googleId: string | null = null;
+        try {
+          const userData = JSON.parse(decodeURIComponent(googleUserCookie.split('=')[1]));
+          googleId = userData.id || null;
+        } catch (e) {
+          console.error('Error parsing user cookie:', e);
+          setCheckingExisting(false);
+          return;
+        }
+
+        if (!googleId) {
+          setCheckingExisting(false);
+          return;
+        }
+
+        const response = await fetch('/api/check-user-portfolio', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ googleId }),
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          setIsPro(result.isPro || false);
+          
+          // If user has existing portfolio and is not Pro, prevent upload
+          if (result.hasPortfolio && !result.isPro) {
+            setHasExistingPortfolio(true);
+            setExistingPortfolioId(result.portfolioId);
+          }
+        }
+      } catch (error) {
+        console.error('Error checking existing portfolio:', error);
+      } finally {
+        setCheckingExisting(false);
+      }
+    };
+
+    checkExistingPortfolio();
+  }, []);
 
   const pdfToImages = async (file: File): Promise<string[]> => {
     try {
@@ -367,7 +426,21 @@ export default function UploadPage() {
 
   const handleProceed = async () => {
     if (!file || uploading || processing) return;
+    
+    // Double check - prevent upload if user has existing portfolio and is not Pro
+    if (hasExistingPortfolio && !isPro) {
+      setError('You have already created a portfolio. Upgrade to Pro to create multiple portfolios.');
+      return;
+    }
+    
     await processFile(file);
+  };
+
+  // Redirect to existing portfolio if user tries to upload again
+  const handleGoToExistingPortfolio = () => {
+    if (existingPortfolioId) {
+      router.push(`/upload/${existingPortfolioId}`);
+    }
   };
 
   return (
@@ -398,35 +471,76 @@ export default function UploadPage() {
       {/* Upload Section */}
       <section className="flex items-center justify-center px-6 py-20 min-h-[calc(100vh-80px)]">
         <div className="max-w-[700px] w-full">
-          <div className="text-center mb-12">
-            <h1
-              className="text-[clamp(2rem,6vw,3.5rem)] leading-[1.1] font-extrabold text-black dark:text-white tracking-[-1px] mb-4"
-              style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}
-            >
-              Upload Your Resume
-            </h1>
-            <p
-              className="text-[16px] md:text-[18px] text-[#60646C] dark:text-[#A0A0A0] leading-relaxed"
-              style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}
-            >
-              Drop your PDF resume below and we'll automatically extract all the
-              information to create your portfolio
-            </p>
-          </div>
+          {checkingExisting ? (
+            <div className="text-center">
+              <Loader className="animate-spin mx-auto mb-4 text-black dark:text-white" size={48} />
+              <p className="text-[#60646C] dark:text-[#A0A0A0]">Checking...</p>
+            </div>
+          ) : hasExistingPortfolio && !isPro ? (
+            <div className="text-center">
+              <div className="mb-8">
+                <div className="w-20 h-20 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center mx-auto mb-6">
+                  <Upload size={40} className="text-orange-600 dark:text-orange-400" />
+                </div>
+                <h1
+                  className="text-[clamp(2rem,6vw,3rem)] leading-[1.1] font-extrabold text-black dark:text-white tracking-[-1px] mb-4"
+                  style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}
+                >
+                  You've Already Created a Portfolio
+                </h1>
+                <p
+                  className="text-[16px] md:text-[18px] text-[#60646C] dark:text-[#A0A0A0] leading-relaxed mb-8"
+                  style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}
+                >
+                  Free users can create one portfolio. Upgrade to Pro to create multiple portfolios.
+                </p>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <button
+                  onClick={handleGoToExistingPortfolio}
+                  className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg text-sm font-medium bg-black dark:bg-white text-white dark:text-black hover:opacity-90 transition"
+                >
+                  Go to My Portfolio
+                </button>
+                <a
+                  href="/pricing"
+                  className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg text-sm font-medium border-2 border-black dark:border-white text-black dark:text-white hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition"
+                >
+                  Upgrade to Pro
+                </a>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="text-center mb-12">
+                <h1
+                  className="text-[clamp(2rem,6vw,3.5rem)] leading-[1.1] font-extrabold text-black dark:text-white tracking-[-1px] mb-4"
+                  style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}
+                >
+                  Upload Your Resume
+                </h1>
+                <p
+                  className="text-[16px] md:text-[18px] text-[#60646C] dark:text-[#A0A0A0] leading-relaxed"
+                  style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}
+                >
+                  Drop your PDF resume below and we'll automatically extract all the
+                  information to create your portfolio
+                </p>
+              </div>
 
           {/* Upload Zone */}
           <div
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
+            onDragOver={hasExistingPortfolio && !isPro ? undefined : handleDragOver}
+            onDragLeave={hasExistingPortfolio && !isPro ? undefined : handleDragLeave}
+            onDrop={hasExistingPortfolio && !isPro ? undefined : handleDrop}
             className={`
               relative border-2 border-dashed rounded-2xl p-16 transition-all duration-200
               ${
-                isDragging
+                isDragging && !hasExistingPortfolio
                   ? 'border-black dark:border-white bg-gray-50 dark:bg-[#1E1E1E] scale-[1.02]'
                   : 'border-[#E5E7EB] dark:border-[#333333] hover:border-[#C9EAE6] dark:hover:border-[#2A5A58]'
               }
-              ${uploading || processing ? 'pointer-events-none opacity-60' : ''}
+              ${uploading || processing || (hasExistingPortfolio && !isPro) ? 'pointer-events-none opacity-60' : ''}
             `}
           >
             <input
@@ -434,7 +548,7 @@ export default function UploadPage() {
               accept=".pdf"
               onChange={handleFileChange}
               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-              disabled={uploading || processing}
+              disabled={uploading || processing || (hasExistingPortfolio && !isPro)}
             />
             <div className="text-center">
               {uploading || processing ? (
@@ -498,7 +612,7 @@ export default function UploadPage() {
               <button
                 type="button"
                 onClick={handleProceed}
-                disabled={uploading || processing}
+                disabled={uploading || processing || (hasExistingPortfolio && !isPro)}
                 className="inline-flex items-center gap-2 px-6 py-3 rounded-lg text-sm font-medium bg-black dark:bg-white text-white dark:text-black hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed transition"
               >
                 {loading ? (
@@ -519,6 +633,8 @@ export default function UploadPage() {
                 {error}
               </p>
             </div>
+          )}
+            </>
           )}
         </div>
       </section>
